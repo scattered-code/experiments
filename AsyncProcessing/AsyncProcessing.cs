@@ -34,7 +34,7 @@ namespace AsyncProcessingBenchmarks
             };
             _documentStore.Initialize();
 
-            //await SeedDatabase();
+            await SeedDatabase();
         }
 
         public async Task SeedDatabase()
