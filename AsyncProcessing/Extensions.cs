@@ -70,10 +70,30 @@ namespace AsyncProcessingBenchmarks
             var block = new ActionBlock<T>(body, options);
 
             await foreach (var item in source)
-                block.Post(item);
+                await block.SendAsync(item);
+
+            block.Complete();
+            await block.Completion;
+        }
+
+        public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, int, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+            
+            var block = new ActionBlock<(T, int)>(opt => body(opt.Item1, opt.Item2), options);
+
+            await foreach (var item in source.WithIndex())
+                await block.SendAsync(item);
 
             block.Complete();
             await block.Completion;
         }
     }
+
+    
 }

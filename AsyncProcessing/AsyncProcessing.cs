@@ -202,6 +202,28 @@ namespace AsyncProcessingBenchmarks
         }
 
         [Benchmark]
+        public async Task AsyncEnumerableParallelForEachWithIndex()
+        {
+            using (var session = _documentStore.OpenAsyncSession())
+            {
+                session.Advanced.MaxNumberOfRequestsPerSession = int.MaxValue;
+
+                SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
+
+                await GetDocumentsFromDatabase2(session).AsyncParallelForEach(async (entry, idx) => {
+                    Console.WriteLine($"Processing entry {idx}: '{entry.Id}'");
+
+                    // This is the most expensive way I can think of doing this, obviously don't do this if you want performance
+                    using (var tempSession = _documentStore.OpenAsyncSession())
+                    {
+                        await tempSession.StoreAsync(new ProcessedOrder { OrderId = entry.Id });
+                        await tempSession.SaveChangesAsync();
+                    }
+                }, Environment.ProcessorCount, TaskScheduler.FromCurrentSynchronizationContext());
+            }
+        }
+
+        [Benchmark]
         public async Task EnumerableParallelLinq()
         {
             using (var session = _documentStore.OpenSession())
