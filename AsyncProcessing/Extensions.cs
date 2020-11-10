@@ -76,6 +76,24 @@ namespace AsyncProcessingBenchmarks
             await block.Completion;
         }
 
+        public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Action<T> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
+        {
+            var options = new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = maxDegreeOfParallelism
+            };
+            if (scheduler != null)
+                options.TaskScheduler = scheduler;
+
+            var block = new ActionBlock<T>(body, options);
+
+            await foreach (var item in source)
+                await block.SendAsync(item);
+
+            block.Complete();
+            await block.Completion;
+        }
+
         public static async Task AsyncParallelForEach<T>(this IAsyncEnumerable<T> source, Func<T, int, Task> body, int maxDegreeOfParallelism = DataflowBlockOptions.Unbounded, TaskScheduler scheduler = null)
         {
             var options = new ExecutionDataflowBlockOptions

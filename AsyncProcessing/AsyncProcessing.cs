@@ -10,6 +10,7 @@ using Raven.Client.Documents.Operations;
 using System.Collections.Generic;
 using Raven.Client.Documents.Session;
 using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace AsyncProcessingBenchmarks
 {
@@ -219,29 +220,33 @@ namespace AsyncProcessingBenchmarks
                         await tempSession.StoreAsync(new ProcessedOrder { OrderId = entry.Id });
                         await tempSession.SaveChangesAsync();
                     }
+                    Console.WriteLine($"Processed entry 7'{entry.Id}'");
                 }, Environment.ProcessorCount, TaskScheduler.FromCurrentSynchronizationContext());
             }
         }
 
         [Benchmark]
-        public async Task EnumerableParallelLinq()
+        public async Task AsyncEnumerableParallelForEachVoid()
         {
-            using (var session = _documentStore.OpenSession())
+            using (var session = _documentStore.OpenAsyncSession())
             {
                 session.Advanced.MaxNumberOfRequestsPerSession = int.MaxValue;
 
-                GetDocumentsFromDatabase(session).AsParallel().WithDegreeOfParallelism(Environment.ProcessorCount)
-                    .ForAll(async entry =>
-                    {
-                        Console.WriteLine($"Processing entry 7'{entry.Id}'");
+                SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
 
-                        // This is the most expensive way I can think of doing this, obviously don't do this if you want performance
-                        using (var tempSession = _documentStore.OpenAsyncSession())
-                        {
-                            await tempSession.StoreAsync(new ProcessedOrder { OrderId = entry.Id });
-                            await tempSession.SaveChangesAsync();
-                        }
-                    });
+                await GetDocumentsFromDatabase2(session).AsyncParallelForEach(ProcessEntry, Environment.ProcessorCount, TaskScheduler.FromCurrentSynchronizationContext());
+            }
+        }
+
+        private async void ProcessEntry(Order entry)
+        {
+            Console.WriteLine($"Processing entry 7'{entry.Id}'");
+
+            // This is the most expensive way I can think of doing this, obviously don't do this if you want performance
+            using (var tempSession = _documentStore.OpenAsyncSession())
+            {
+                await tempSession.StoreAsync(new ProcessedOrder { OrderId = entry.Id });
+                await tempSession.SaveChangesAsync();
             }
         }
 
